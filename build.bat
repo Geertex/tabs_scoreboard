@@ -10,6 +10,14 @@ SET BACKEND_DIR=./imgui/backends
 :: Create the build directory if it doesn't exist
 if not exist %OUT_DIR% mkdir %OUT_DIR%
 
+:: --- Sync Assets ---
+:: This copies everything from an 'assets' folder to your 'build' folder
+:: /I creates the folder if it doesn't exist, /Y overwrites without asking
+if exist "assets" (
+    echo Syncing assets...
+    xcopy /y /i /e "assets" "%OUT_DIR%\assets" >nul
+)
+
 echo Building project...
 
 :: --- Compilation ---
