@@ -11,6 +11,15 @@
 #include "imgui_impl_dx11.h"
 #include <d3d11.h>
 #include <tchar.h>
+#include <string>
+#include <vector>
+#include "Player.h"
+#include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // Data
 static ID3D11Device*            g_pd3dDevice = nullptr;
@@ -26,6 +35,42 @@ void CleanupDeviceD3D();
 void CreateRenderTarget();
 void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+void SavePlayersToCSV(const std::vector<Player>& players, const std::string& filename) {
+    fs::path p(filename);
+    if (p.has_parent_path()) {
+        fs::create_directories(p.parent_path());
+    }
+
+    std::ofstream file(filename);
+
+    if (!file.is_open()) {
+        printf("ERROR: Could not create file %s\n", filename.c_str());
+        return;
+    }
+
+    for (const auto& player : players) {
+        file << player.GetName() << "\n";
+    }
+
+    file.close();
+    printf("Successfully saved %zu players to %s\n", players.size(), filename.c_str());
+}
+
+void LoadPlayersFromCSV(std::vector<Player>& players, const std::string& filename) {
+    std::ifstream file(filename);
+    std::string line;
+
+    if (file.is_open()) {
+        players.clear();
+        while (std::getline(file, line)) {
+            if (!line.empty()) {
+                players.emplace_back(line, 0);
+            }
+        }
+        file.close();
+    }
+}
 
 // Main code
 int main(int, char**)
@@ -105,9 +150,13 @@ int main(int, char**)
     //IM_ASSERT(font != nullptr);
 
     // Our state
+    bool show_player_window = true;
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    std::vector<Player> players;
+    LoadPlayersFromCSV(players, "data/players.csv");
 
     // Main loop
     bool done = false;
@@ -157,11 +206,12 @@ int main(int, char**)
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+            ImGui::Begin("TABS Score window selecter");                          // Create a window called "Hello, world!" and append into it.
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+            ImGui::Text("Select relevant window.");               // Display some text (you can use a format strings too)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
+            ImGui::Checkbox("Show Player Window", &show_player_window);
 
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
@@ -172,6 +222,84 @@ int main(int, char**)
             ImGui::Text("counter = %d", counter);
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
+        }
+
+        if (show_player_window) {
+            ImGui::Begin("Player Window", &show_player_window);
+            if (ImGui::BeginTable("PlayerTable", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit)) {
+                // 1. Setup Headers
+                ImGui::TableSetupColumn("Player Name");
+                ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_WidthFixed, 150.0f);
+                ImGui::TableHeadersRow();;
+
+            if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
+                    if (sorts_specs->SpecsDirty) {
+                        // This block runs ONLY when the user clicks a header
+                        std::sort(players.begin(), players.end(), [&](const Player& a, const Player& b) {
+                            for (int n = 0; n < sorts_specs->SpecsCount; n++)
+                            {
+                                const ImGuiTableColumnSortSpecs* spec = &sorts_specs->Specs[n];
+                                
+                                bool res = false;
+                                if (spec->ColumnIndex == 0) // Sort by Name
+                                    res = strcmp(a.GetName(), b.GetName()) < 0;
+                                else if (spec->ColumnIndex == 1) // Sort by Score
+                                    res = a.GetScore() < b.GetScore();
+
+                                if (spec->SortDirection == ImGuiSortDirection_Descending)
+                                    res = !res;
+                                
+                                return res;
+                            }
+                            return false;
+                        });
+                        sorts_specs->SpecsDirty = false; // Mark as "handled"
+                    }
+                }
+
+                // 2. Fill Rows
+                for (const auto& player : players)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%s", player.GetName());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%d", player.GetScore());
+                }
+
+                ImGui::EndTable();
+            }
+
+            if (ImGui::Button("New Player"))
+                ImGui::OpenPopup("Create New Player");
+            ImGui::SameLine();
+            if (ImGui::Button("Save Players")){SavePlayersToCSV(players, "data/players.csv");}
+            ImGui::SameLine();
+            if (ImGui::Button("Load Players")){LoadPlayersFromCSV(players, "data/players.csv");}
+            ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+            ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if (ImGui::BeginPopupModal("Create New Player", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+            {
+                static char name_input[32] = "";
+                ImGui::InputTextWithHint("##NameInput", "Enter player name...", name_input, IM_COUNTOF(name_input));
+
+                if (ImGui::Button("Save", ImVec2(120, 0))) {
+                    players.emplace_back(name_input, 0);
+                    SavePlayersToCSV(players, "data/players.csv");
+                    name_input[0] = '\0';
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::SetItemDefaultFocus();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel", ImVec2(120, 0))) {
+                    name_input[0] = '\0';
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
+
             ImGui::End();
         }
 

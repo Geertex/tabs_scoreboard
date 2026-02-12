@@ -23,6 +23,7 @@ echo Building project...
 :: --- Compilation ---
 :: /Fo%OUT_DIR%\  tells clang-cl to put all .obj files in the build folder
 clang-cl ^
+    -std:c++17 ^
     main.cpp ^
     %IMGUI_DIR%/*.cpp ^
     %BACKEND_DIR%/imgui_impl_win32.cpp ^
