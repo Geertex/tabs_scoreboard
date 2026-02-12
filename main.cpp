@@ -309,7 +309,10 @@ int main(int, char**)
                     ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "This name is already taken!");
                 }
 
-                ImGui::SetKeyboardFocusHere();
+                if (ImGui::IsWindowAppearing()) {
+                    ImGui::SetKeyboardFocusHere();
+                }
+                
                 ImGui::InputTextWithHint("##NameInput", "Enter player name...", name_input, IM_COUNTOF(name_input));
 
 
