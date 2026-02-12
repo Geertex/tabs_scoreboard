@@ -14,10 +14,12 @@
 #include <string>
 #include <vector>
 #include "Player.h"
+#include "Match.h"
 #include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <filesystem>
+#include <memory>
 
 namespace fs = std::filesystem;
 
@@ -77,6 +79,14 @@ bool NameExists(const std::vector<Player>& list, const std::string& name) {
         return std::string(p.GetName()) == name;
     }) != list.end();
 }
+
+Player* FindPlayer(std::vector<Player>& list, const std::string& name) {
+    for (auto& p : list) {
+        if (std::string(p.GetName()) == name) return &p;
+    }
+    return nullptr;
+}
+
 
 // Main code
 int main(int, char**)
@@ -166,6 +176,10 @@ int main(int, char**)
     LoadPlayersFromCSV(players, "data/players.csv");
     std::vector<Player> player_queue;
 
+    std::vector<Match> match_history;
+    std::unique_ptr<Match> active_match = nullptr;
+    static std::string last_winner_name = "";
+
     // Main loop
     bool done = false;
     while (!done)
@@ -205,32 +219,94 @@ int main(int, char**)
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
         {
-            static float f = 0.0f;
-            static int counter = 0;
 
-            ImGui::Begin("TABS Score window selecter");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("Select relevant window.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+            ImGui::Begin("TABS Score window selecter");
+            ImGui::Checkbox("Demo Window", &show_demo_window);
             ImGui::Checkbox("Show Player Window", &show_player_window);
             ImGui::Checkbox("Show Queue Window", &show_queue_window);
+            
+            if (!last_winner_name.empty()){
+                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Previous Winner: %s", last_winner_name.c_str());
+            }
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+            if (active_match) {
+                ImGui::SeparatorText("ACTIVE MATCH");
 
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
+                // Calculate window width to make buttons even
+                float width = ImGui::GetContentRegionAvail().x;
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+                // --- RED PLAYER BLOCK ---
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));       // Dark Red
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f)); // Bright Red
+                
+                if (ImGui::Button(active_match->GetRed(), ImVec2(width * 0.45f, 60.0f))) {
+                    active_match->RedWins();
+                }
+                ImGui::PopStyleColor(2);
+
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(width * 0.47f);
+                ImGui::Text("VS");
+                ImGui::SameLine();
+
+                // --- BLUE PLAYER BLOCK ---
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.6f, 1.0f));       // Dark Blue
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.8f, 1.0f)); // Bright Blue
+
+                if (ImGui::Button(active_match->GetBlue(), ImVec2(width * 0.45f, 60.0f))) {
+                    active_match->BlueWins();
+                }
+                ImGui::PopStyleColor(2);
+
+                if (!active_match->IsActive()) {
+                    last_winner_name = active_match->GetWinner();
+                    player_queue.push_back(*FindPlayer(players, active_match->GetLoser()));
+                    match_history.push_back(*active_match);
+                    active_match.reset();
+                }
+
+                if (ImGui::Button("Cancel Match")) {
+                    // Find Red Player in the master list
+                    Player* pRed = FindPlayer(players, active_match->GetRed());
+                    
+
+                    // Find Blue Player in the master list
+                    Player* pBlue = FindPlayer(players, active_match->GetBlue());
+
+                    // Insert them back at the START of the queue (index 0)
+                    // We do Blue then Red so that Red ends up being the very first item
+                    if (pBlue) {
+                        player_queue.insert(player_queue.begin(), *pBlue);
+                    }
+                    if (pRed) {
+                        player_queue.insert(player_queue.begin(), *pRed);
+                    }
+
+                    // Clean up the match
+                    active_match.reset();
+                }
+            } else if (!last_winner_name.empty()){
+                if (!player_queue.empty()) {
+                    if (ImGui::Button("Next Match")) {
+                        active_match = std::make_unique<Match>(player_queue[0].GetName(), last_winner_name);
+                        player_queue.erase(player_queue.begin());
+                    }
+                } else {
+                    ImGui::TextDisabled("(Waiting for next challenger to join the queue...)");
+                }
+            } else if (player_queue.size() >= 2 && !active_match) {
+                if (ImGui::Button("Start Match")) {
+                    active_match = std::make_unique<Match>(player_queue[0].GetName(), player_queue[1].GetName());
+                    player_queue.erase(player_queue.begin());
+                    player_queue.erase(player_queue.begin());
+                }
+            } else {
+                ImGui::BeginDisabled();
+                ImGui::Button("Start Match (Need 2 Players and no active match)");
+                ImGui::EndDisabled();
+            }
+
             ImGui::End();
         }
 
@@ -272,6 +348,19 @@ int main(int, char**)
                 {
                     bool alreadyInQueue = NameExists(player_queue, player.GetName());
 
+                    bool isLastWinner = (player.GetName() == last_winner_name);
+
+                    bool alreadyInMatch = false;
+                    if (active_match) {
+                        if (std::string(player.GetName()) == active_match->GetRed() || 
+                            std::string(player.GetName()) == active_match->GetBlue()) {
+                            alreadyInMatch = true;
+                        }
+                    }
+
+                    // 2. Determine if the "Add" button should be disabled
+                    bool disableAdd = alreadyInQueue || alreadyInMatch || isLastWinner;
+
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%s", player.GetName());
@@ -279,7 +368,7 @@ int main(int, char**)
                     ImGui::Text("%d", player.GetScore());
                     ImGui::TableSetColumnIndex(2);
                     ImGui::PushID(&player);
-                    if (!alreadyInQueue) {
+                    if (!disableAdd) {
                         if (ImGui::Button("Add to Queue")) {
                             player_queue.push_back(player);
                         }
@@ -312,7 +401,7 @@ int main(int, char**)
                 if (ImGui::IsWindowAppearing()) {
                     ImGui::SetKeyboardFocusHere();
                 }
-                
+
                 ImGui::InputTextWithHint("##NameInput", "Enter player name...", name_input, IM_COUNTOF(name_input));
 
 
@@ -380,16 +469,6 @@ int main(int, char**)
 
                 ImGui::PopID();
             }
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
             ImGui::End();
         }
 
