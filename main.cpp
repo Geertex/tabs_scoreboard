@@ -168,7 +168,6 @@ int main(int, char**)
     // Our state
     bool show_queue_window = true;
     bool show_player_window = true;
-    bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -222,7 +221,6 @@ int main(int, char**)
         {
 
             ImGui::Begin("TABS Score window selecter");
-            ImGui::Checkbox("Demo Window", &show_demo_window);
             ImGui::Checkbox("Show Player Window", &show_player_window);
             ImGui::Checkbox("Show Queue Window", &show_queue_window);
             
@@ -311,6 +309,7 @@ int main(int, char**)
         }
 
         if (show_player_window) {
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
             ImGui::Begin("Player Window", &show_player_window);
             if (ImGui::BeginTable("PlayerTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit)) {
                 // 1. Setup Headers
@@ -432,6 +431,7 @@ int main(int, char**)
         }
 
         if (show_queue_window) {
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
             ImGui::Begin("Queue Window", &show_queue_window);
             for (int n = 0; n < player_queue.size(); n++) {
                 ImGui::PushID(n);
