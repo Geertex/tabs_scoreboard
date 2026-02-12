@@ -72,6 +72,12 @@ void LoadPlayersFromCSV(std::vector<Player>& players, const std::string& filenam
     }
 }
 
+bool NameExists(const std::vector<Player>& list, const std::string& name) {
+    return std::find_if(list.begin(), list.end(), [&](const Player& p) {
+        return std::string(p.GetName()) == name;
+    }) != list.end();
+}
+
 // Main code
 int main(int, char**)
 {
@@ -150,6 +156,7 @@ int main(int, char**)
     //IM_ASSERT(font != nullptr);
 
     // Our state
+    bool show_queue_window = true;
     bool show_player_window = true;
     bool show_demo_window = true;
     bool show_another_window = false;
@@ -157,6 +164,7 @@ int main(int, char**)
 
     std::vector<Player> players;
     LoadPlayersFromCSV(players, "data/players.csv");
+    std::vector<Player> player_queue;
 
     // Main loop
     bool done = false;
@@ -212,6 +220,7 @@ int main(int, char**)
             ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
             ImGui::Checkbox("Another Window", &show_another_window);
             ImGui::Checkbox("Show Player Window", &show_player_window);
+            ImGui::Checkbox("Show Queue Window", &show_queue_window);
 
             ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
             ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
@@ -227,7 +236,7 @@ int main(int, char**)
 
         if (show_player_window) {
             ImGui::Begin("Player Window", &show_player_window);
-            if (ImGui::BeginTable("PlayerTable", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit)) {
+            if (ImGui::BeginTable("PlayerTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit)) {
                 // 1. Setup Headers
                 ImGui::TableSetupColumn("Player Name");
                 ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_WidthFixed, 150.0f);
@@ -261,11 +270,21 @@ int main(int, char**)
                 // 2. Fill Rows
                 for (const auto& player : players)
                 {
+                    bool alreadyInQueue = NameExists(player_queue, player.GetName());
+
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
                     ImGui::Text("%s", player.GetName());
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text("%d", player.GetScore());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::PushID(&player);
+                    if (!alreadyInQueue) {
+                        if (ImGui::Button("Add to Queue")) {
+                            player_queue.push_back(player);
+                        }
+                    }
+                    ImGui::PopID();
                 }
 
                 ImGui::EndTable();
@@ -283,15 +302,32 @@ int main(int, char**)
             if (ImGui::BeginPopupModal("Create New Player", NULL, ImGuiWindowFlags_AlwaysAutoResize))
             {
                 static char name_input[32] = "";
+                bool nameExists =  NameExists(players, name_input);
+                bool isInvalid = nameExists || (name_input[0] == '\0');
+
+                if (nameExists) {
+                    ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "This name is already taken!");
+                }
+
+                ImGui::SetKeyboardFocusHere();
                 ImGui::InputTextWithHint("##NameInput", "Enter player name...", name_input, IM_COUNTOF(name_input));
 
+
+                if (isInvalid)
+                    ImGui::BeginDisabled();
+                
                 if (ImGui::Button("Save", ImVec2(120, 0))) {
                     players.emplace_back(name_input, 0);
                     SavePlayersToCSV(players, "data/players.csv");
                     name_input[0] = '\0';
                     ImGui::CloseCurrentPopup();
                 }
-                ImGui::SetItemDefaultFocus();
+
+                if (isInvalid)
+                    ImGui::EndDisabled();
+                else
+                    ImGui::SetItemDefaultFocus();
+                
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel", ImVec2(120, 0))) {
                     name_input[0] = '\0';
@@ -300,6 +336,47 @@ int main(int, char**)
                 ImGui::EndPopup();
             }
 
+            ImGui::End();
+        }
+
+        if (show_queue_window) {
+            ImGui::Begin("Queue Window", &show_queue_window);
+            for (int n = 0; n < player_queue.size(); n++) {
+                ImGui::PushID(n);
+                ImGui::Button(player_queue[n].GetName());
+                // Our buttons are both drag sources and drag targets here!
+                if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+                {
+                    ImGui::SetDragDropPayload("DND_DEMO_CELL", &n, sizeof(int));
+                    ImGui::Text("Move %s", player_queue[n].GetName());
+                    ImGui::EndDragDropSource();
+                }
+                if (ImGui::BeginDragDropTarget())
+                {
+                    if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("DND_DEMO_CELL"))
+                    {
+                        IM_ASSERT(payload->DataSize == sizeof(int));
+                        int source_index = *(const int*)payload->Data;
+                        int target_index = n;
+
+                        if (source_index != target_index) {
+                            Player moved_player = player_queue[source_index];
+                            player_queue.erase(player_queue.begin() + source_index);
+                            player_queue.insert(player_queue.begin() + target_index, moved_player);
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Remove")) {
+                    player_queue.erase(player_queue.begin() + n);
+                    ImGui::PopID();
+                    break;
+                }
+
+                ImGui::PopID();
+            }
             ImGui::End();
         }
 
