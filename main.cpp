@@ -1,6 +1,3 @@
-// todo:
-// next match moet winnaar kleur behouden.
-
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
@@ -281,7 +278,12 @@ int main(int, char**)
             } else if (!last_winner_name.empty()){
                 if (!player_queue.empty()) {
                     if (ImGui::Button("Next Match")) {
-                        active_match = std::make_unique<Match>(player_queue[0].GetName(), last_winner_name);
+                        if (match_history.back().GetBlue() == last_winner_name) {
+                            active_match = std::make_unique<Match>(player_queue[0].GetName(), last_winner_name);
+                        } else {
+                            active_match = std::make_unique<Match>(last_winner_name, player_queue[0].GetName());
+                        }
+                        
                         player_queue.erase(player_queue.begin());
                     }
                 } else {
