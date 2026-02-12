@@ -1,6 +1,5 @@
 // todo:
 // next match moet winnaar kleur behouden.
-// bij cancel match moet vorige winnaar niet op queue.
 
 #include "imgui.h"
 #include "imgui_impl_win32.h"
@@ -263,17 +262,16 @@ int main(int, char**)
                 if (ImGui::Button("Cancel Match")) {
                     // Find Red Player in the master list
                     Player* pRed = FindPlayer(players, active_match->GetRed());
-                    
 
                     // Find Blue Player in the master list
                     Player* pBlue = FindPlayer(players, active_match->GetBlue());
 
                     // Insert them back at the START of the queue (index 0)
                     // We do Blue then Red so that Red ends up being the very first item
-                    if (pBlue) {
+                    if (pBlue && (last_winner_name.empty() || active_match->GetRed() == last_winner_name)) {
                         player_queue.insert(player_queue.begin(), *pBlue);
                     }
-                    if (pRed) {
+                    if (pRed && (last_winner_name.empty() || active_match->GetBlue() == last_winner_name)) {
                         player_queue.insert(player_queue.begin(), *pRed);
                     }
 
