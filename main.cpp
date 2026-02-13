@@ -66,6 +66,56 @@ void LoadPlayersFromCSV(std::vector<Player>& players, const std::string& filenam
     }
 }
 
+void SaveMatchHistoryToCSV(const std::vector<Match>& match_history, const std::string& filename) {
+    fs::path p(filename);
+    if (p.has_parent_path()) {
+        fs::create_directories(p.parent_path());
+    }
+
+    std::ofstream file(filename);
+
+    if (!file.is_open()) {
+        printf("ERROR: Could not create file %s\n", filename.c_str());
+        return;
+    }
+
+    file << "Timestamp,RedPlayer,BluePlayer,Winner,Loser\n";
+
+    for (const auto& match : match_history) {
+        file << match.GetTimestamp() << ","
+        << match.GetRed() << ","
+        << match.GetBlue() << ","
+        << match.GetWinner() << ","
+        << match.GetLoser() << ","
+        << "\n";
+    }
+
+    file.close();
+    printf("Successfully saved %zu players to %s\n", match_history.size(), filename.c_str());
+}
+
+void LoadMatchHistoryFromCSV(std::vector<Match>& match_history, const std::string& filename) {
+    std::ifstream file(filename);
+    std::string line;
+
+    if (file.is_open()) {
+        match_history.clear();
+        std::getline(file, line);
+        while (std::getline(file, line)) {
+            std::stringstream ss(line);
+            std::string timestamp,redName,blueName,winner,loser;
+            if (std::getline(ss, timestamp, ',') &&
+                std::getline(ss, redName, ',') &&
+                std::getline(ss, blueName, ',') &&
+                std::getline(ss, winner, ',') &&
+                std::getline(ss, loser, ',')) {
+                match_history.emplace_back(stoll(timestamp), redName, blueName, winner, loser);
+            }
+        }
+        file.close();
+    }
+}
+
 bool NameExists(const std::vector<Player>& list, const std::string& name) {
     return std::find_if(list.begin(), list.end(), [&](const Player& p) {
         return std::string(p.GetName()) == name;
@@ -157,10 +207,9 @@ int main(int, char**)
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf");
     //IM_ASSERT(font != nullptr);
 
-    // Our state
     bool show_queue_window = true;
     bool show_player_window = true;
-    bool show_another_window = false;
+    bool show_match_history_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     std::vector<Player> players;
@@ -168,6 +217,8 @@ int main(int, char**)
     std::vector<Player> player_queue;
 
     std::vector<Match> match_history;
+    LoadMatchHistoryFromCSV(match_history, "data/match_history.csv");
+
     std::unique_ptr<Match> active_match = nullptr;
     static std::string last_winner_name = "";
 
@@ -215,6 +266,7 @@ int main(int, char**)
             ImGui::Begin("TABS Score window selecter");
             ImGui::Checkbox("Show Player Window", &show_player_window);
             ImGui::Checkbox("Show Queue Window", &show_queue_window);
+            ImGui::Checkbox("Show Match History Window", &show_match_history_window);
             
             if (!last_winner_name.empty()){
                 ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Previous Winner: %s", last_winner_name.c_str());
@@ -253,6 +305,7 @@ int main(int, char**)
                     last_winner_name = active_match->GetWinner();
                     player_queue.push_back(*FindPlayer(players, active_match->GetLoser()));
                     match_history.push_back(*active_match);
+                    SaveMatchHistoryToCSV(match_history, "data/match_history.csv");
                     active_match.reset();
                 }
 
@@ -311,7 +364,7 @@ int main(int, char**)
                 // 1. Setup Headers
                 ImGui::TableSetupColumn("Player Name");
                 ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_WidthFixed, 150.0f);
-                ImGui::TableHeadersRow();;
+                ImGui::TableHeadersRow();
 
             if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
                     if (sorts_specs->SpecsDirty) {
@@ -465,6 +518,39 @@ int main(int, char**)
 
                 ImGui::PopID();
             }
+            ImGui::End();
+        }
+
+        if (show_match_history_window) {
+            ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
+            ImGui::Begin("Match History Window", &show_match_history_window);
+
+            if (ImGui::BeginTable("MatchHistoryTable", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |  ImGuiTableFlags_SizingFixedFit)) {
+                // 1. Setup Headers
+                ImGui::TableSetupColumn("Time Stamp");
+                ImGui::TableSetupColumn("Red Player");
+                ImGui::TableSetupColumn("Blue Player");
+                ImGui::TableSetupColumn("Winner");
+                ImGui::TableSetupColumn("Loser");
+                ImGui::TableHeadersRow();
+
+
+                for (const auto& match : match_history) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("%lld", match.GetTimestamp());
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%s", match.GetRed());
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%s", match.GetBlue());
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("%s", match.GetWinner());
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::Text("%s", match.GetLoser());
+                }
+                ImGui::EndTable();
+            }
+            if (ImGui::Button("Load Match History")){LoadMatchHistoryFromCSV(match_history, "data/match_history.csv");}
             ImGui::End();
         }
 

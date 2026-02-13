@@ -14,6 +14,9 @@ public:
     Match(std::string red, std::string blue) 
         : redName(red), blueName(blue), timestamp(0), winner(""), loser("") {}
 
+    Match(long long timestamp, std::string red, std::string blue, std::string winner, std::string loser) 
+        : timestamp(timestamp), redName(red), blueName(blue), winner(winner), loser(loser) {}
+
     void RedWins() {
         winner = redName;
         loser = blueName;
