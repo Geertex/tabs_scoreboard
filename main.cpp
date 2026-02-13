@@ -114,6 +114,10 @@ void LoadMatchHistoryFromCSV(std::vector<Match>& match_history, const std::strin
         }
         file.close();
     }
+
+    std::sort(match_history.begin(), match_history.end(), [](const Match& a, const Match& b) {
+        return a.GetTimestamp() < b.GetTimestamp();
+    });
 }
 
 bool NameExists(const std::vector<Player>& list, const std::string& name) {
@@ -127,6 +131,42 @@ Player* FindPlayer(std::vector<Player>& list, const std::string& name) {
         if (std::string(p.GetName()) == name) return &p;
     }
     return nullptr;
+}
+
+void ResetPlayerScores(std::vector<Player>& players) {
+    for (auto& player : players) {
+        player.ResetScore();
+    }
+}
+
+void CalculateStreakScores(const std::vector<Match>& match_history, std::vector<Player>& players) {
+    ResetPlayerScores(players);
+    std::string current_streak_player_name = "";
+    int current_streak_count = 0;
+    Player* current_streak_player = nullptr;
+
+    for (const auto& match : match_history) {
+        if (current_streak_player_name == match.GetWinner()) {
+            current_streak_count++;
+        } else {
+            current_streak_player_name = match.GetWinner();
+            current_streak_count = 1;
+        }
+        current_streak_player = FindPlayer(players, current_streak_player_name);
+        if (current_streak_player) {
+            current_streak_player->SubmitStreak(current_streak_count);
+        }
+    }
+}
+
+int CalculateCurrentStreak(const std::vector<Match>& match_history, const std::string& name) {
+    int streak = 0;
+    for (int i = (int)match_history.size() - 1; i >= 0; i--) {
+        const auto& match = match_history[i];
+        if (match.GetWinner() == name) streak ++;
+        else break;
+    }
+    return streak;
 }
 
 
@@ -219,8 +259,11 @@ int main(int, char**)
     std::vector<Match> match_history;
     LoadMatchHistoryFromCSV(match_history, "data/match_history.csv");
 
+    CalculateStreakScores(match_history, players);
+
     std::unique_ptr<Match> active_match = nullptr;
     static std::string last_winner_name = "";
+    if (!match_history.empty()) last_winner_name = match_history.back().GetWinner();
 
     // Main loop
     bool done = false;
@@ -268,8 +311,15 @@ int main(int, char**)
             ImGui::Checkbox("Show Queue Window", &show_queue_window);
             ImGui::Checkbox("Show Match History Window", &show_match_history_window);
             
-            if (!last_winner_name.empty()){
-                ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Previous Winner: %s", last_winner_name.c_str());
+            if (!last_winner_name.empty()) {
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
+                ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "HOLDER OF THE CROWN :"); // Gold color
+                ImGui::SameLine();
+                ImGui::Text("%s", last_winner_name.c_str());
+                ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "WIN STREAK = ");
+                ImGui::SameLine();
+                ImGui::Text("%d", CalculateCurrentStreak(match_history, last_winner_name));
+                ImGui::PopStyleVar();
             }
 
             if (active_match) {
@@ -307,6 +357,7 @@ int main(int, char**)
                     match_history.push_back(*active_match);
                     SaveMatchHistoryToCSV(match_history, "data/match_history.csv");
                     active_match.reset();
+                    CalculateStreakScores(match_history, players);
                 }
 
                 if (ImGui::Button("Cancel Match")) {
@@ -525,7 +576,7 @@ int main(int, char**)
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
             ImGui::Begin("Match History Window", &show_match_history_window);
 
-            if (ImGui::BeginTable("MatchHistoryTable", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |  ImGuiTableFlags_SizingFixedFit)) {
+            if (ImGui::BeginTable("MatchHistoryTable", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |  ImGuiTableFlags_SizingFixedFit )) {
                 // 1. Setup Headers
                 ImGui::TableSetupColumn("Time Stamp");
                 ImGui::TableSetupColumn("Red Player");
@@ -534,11 +585,22 @@ int main(int, char**)
                 ImGui::TableSetupColumn("Loser");
                 ImGui::TableHeadersRow();
 
-
-                for (const auto& match : match_history) {
+                for (int i = (int)match_history.size() - 1; i >= 0; i--) {
+                    const auto& match = match_history[i];
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("%lld", match.GetTimestamp());
+
+                    std::time_t ts = (std::time_t)match.GetTimestamp();
+                    struct tm buf; 
+                    // On Windows, the order is (output_struct_ptr, input_time_ptr)
+                    if (localtime_s(&buf, &ts) == 0) {
+                        char time_buffer[20];
+                        std::strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%d %H:%M", &buf);
+                        ImGui::Text("%s", time_buffer);
+                    } else {
+                        ImGui::Text("Invalid Date");
+                    }
+
                     ImGui::TableSetColumnIndex(1);
                     ImGui::Text("%s", match.GetRed());
                     ImGui::TableSetColumnIndex(2);
@@ -550,7 +612,12 @@ int main(int, char**)
                 }
                 ImGui::EndTable();
             }
-            if (ImGui::Button("Load Match History")){LoadMatchHistoryFromCSV(match_history, "data/match_history.csv");}
+            if (ImGui::Button("Load Match History")){
+                LoadMatchHistoryFromCSV(match_history, "data/match_history.csv");
+                last_winner_name = "";
+                if (!match_history.empty()) last_winner_name = match_history.back().GetWinner();
+                CalculateStreakScores(match_history, players);
+            }
             ImGui::End();
         }
 
