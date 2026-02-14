@@ -1,6 +1,11 @@
 #include "imgui.h"
+#ifdef _WIN32
 #include "imgui_impl_win32.h"
 #include "imgui_impl_dx11.h"
+#else
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+#endif  // Todo: Add Linux build support
 #include <d3d11.h>
 #include <tchar.h>
 #include <string>
@@ -310,7 +315,7 @@ int main(int, char**)
             ImGui::Checkbox("Show Player Window", &show_player_window);
             ImGui::Checkbox("Show Queue Window", &show_queue_window);
             ImGui::Checkbox("Show Match History Window", &show_match_history_window);
-            
+
             if (!last_winner_name.empty()) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
                 ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "HOLDER OF THE CROWN :"); // Gold color
@@ -331,7 +336,7 @@ int main(int, char**)
                 // --- RED PLAYER BLOCK ---
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));       // Dark Red
                 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f)); // Bright Red
-                
+
                 if (ImGui::Button(active_match->GetRed(), ImVec2(width * 0.45f, 60.0f))) {
                     active_match->RedWins();
                 }
@@ -387,7 +392,7 @@ int main(int, char**)
                         } else {
                             active_match = std::make_unique<Match>(last_winner_name, player_queue[0].GetName());
                         }
-                        
+
                         player_queue.erase(player_queue.begin());
                     }
                 } else {
@@ -424,7 +429,7 @@ int main(int, char**)
                             for (int n = 0; n < sorts_specs->SpecsCount; n++)
                             {
                                 const ImGuiTableColumnSortSpecs* spec = &sorts_specs->Specs[n];
-                                
+
                                 bool res = false;
                                 if (spec->ColumnIndex == 0) // Sort by Name
                                     res = strcmp(a.GetName(), b.GetName()) < 0;
@@ -433,7 +438,7 @@ int main(int, char**)
 
                                 if (spec->SortDirection == ImGuiSortDirection_Descending)
                                     res = !res;
-                                
+
                                 return res;
                             }
                             return false;
@@ -451,7 +456,7 @@ int main(int, char**)
 
                     bool alreadyInMatch = false;
                     if (active_match) {
-                        if (std::string(player.GetName()) == active_match->GetRed() || 
+                        if (std::string(player.GetName()) == active_match->GetRed() ||
                             std::string(player.GetName()) == active_match->GetBlue()) {
                             alreadyInMatch = true;
                         }
@@ -506,7 +511,7 @@ int main(int, char**)
 
                 if (isInvalid)
                     ImGui::BeginDisabled();
-                
+
                 if (ImGui::Button("Save", ImVec2(120, 0))) {
                     players.emplace_back(name_input, 0);
                     SavePlayersToCSV(players, "data/players.csv");
@@ -518,7 +523,7 @@ int main(int, char**)
                     ImGui::EndDisabled();
                 else
                     ImGui::SetItemDefaultFocus();
-                
+
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel", ImVec2(120, 0))) {
                     name_input[0] = '\0';
@@ -591,7 +596,7 @@ int main(int, char**)
                     ImGui::TableSetColumnIndex(0);
 
                     std::time_t ts = (std::time_t)match.GetTimestamp();
-                    struct tm buf; 
+                    struct tm buf;
                     // On Windows, the order is (output_struct_ptr, input_time_ptr)
                     if (localtime_s(&buf, &ts) == 0) {
                         char time_buffer[20];
