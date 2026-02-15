@@ -71,7 +71,7 @@ namespace TABSScoreboard
         }
 
         file.close();
-        printf("Successfully saved %zu players to %s\n", match_history.size(), filename.c_str());
+        printf("Successfully saved %zu matches to %s\n", match_history.size(), filename.c_str());
     }
 
     void LoadMatchHistoryFromCSV(std::vector<Match>& match_history, const std::string& filename) {
