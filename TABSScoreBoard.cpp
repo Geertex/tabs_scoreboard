@@ -162,6 +162,7 @@ namespace TABSScoreboard
     static bool show_queue_window = true;
     static bool show_player_window = true;
     static bool show_match_history_window = true;
+    static bool show_demo_window = false;
 
 
     void InitializeTABSWindows() {
@@ -183,12 +184,16 @@ namespace TABSScoreboard
                 ImGui::MenuItem("Player", nullptr, &show_player_window);
                 ImGui::MenuItem("Queue", nullptr, &show_queue_window);
                 ImGui::MenuItem("Match History", nullptr, &show_match_history_window);
+                ImGui::MenuItem("IMGUI Demo Window", nullptr, &show_demo_window);
                 ImGui::EndMenu();
             }
             ImGui::EndMainMenuBar();
         }
 
         ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
 
         {
 
@@ -293,11 +298,11 @@ namespace TABSScoreboard
 
         if (show_player_window) {
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            ImGui::Begin("Player Window", &show_player_window);
+            ImGui::Begin("Players", &show_player_window);
             if (ImGui::BeginTable("PlayerTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Sortable | ImGuiTableFlags_SizingFixedFit)) {
                 // 1. Setup Headers
                 ImGui::TableSetupColumn("Player Name");
-                ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_PreferSortDescending | ImGuiTableColumnFlags_WidthFixed, 150.0f);
+                ImGui::TableSetupColumn("Score", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_PreferSortDescending );
                 ImGui::TableHeadersRow();
 
             if (ImGuiTableSortSpecs* sorts_specs = ImGui::TableGetSortSpecs()) {
@@ -415,7 +420,12 @@ namespace TABSScoreboard
 
         if (show_queue_window) {
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            ImGui::Begin("Queue Window", &show_queue_window);
+            ImGui::Begin("Queue", &show_queue_window);
+
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)) {
+                ImGui::SetTooltip("FA");
+            }
+
             for (int n = 0; n < player_queue.size(); n++) {
                 ImGui::PushID(n);
                 ImGui::Button(player_queue[n].GetName());
@@ -457,7 +467,7 @@ namespace TABSScoreboard
 
         if (show_match_history_window) {
             ImGui::SetNextWindowSizeConstraints(ImVec2(400, 300), ImVec2(FLT_MAX, FLT_MAX));
-            ImGui::Begin("Match History Window", &show_match_history_window);
+            ImGui::Begin("Match History", &show_match_history_window);
 
             if (ImGui::BeginTable("MatchHistoryTable", 5, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders |  ImGuiTableFlags_SizingFixedFit )) {
                 // 1. Setup Headers
