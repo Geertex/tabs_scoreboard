@@ -177,12 +177,22 @@ namespace TABSScoreboard
     }
 
     void RenderTABSWindows() {
+
+        if (ImGui::BeginMainMenuBar()) {
+            if (ImGui::BeginMenu("Windows")) {
+                ImGui::MenuItem("Player", nullptr, &show_player_window);
+                ImGui::MenuItem("Queue", nullptr, &show_queue_window);
+                ImGui::MenuItem("Match History", nullptr, &show_match_history_window);
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
+
+        ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+
         {
 
-            ImGui::Begin("TABS Score window selecter");
-            ImGui::Checkbox("Show Player Window", &show_player_window);
-            ImGui::Checkbox("Show Queue Window", &show_queue_window);
-            ImGui::Checkbox("Show Match History Window", &show_match_history_window);
+            ImGui::Begin("TABS Match Orchestrator");
             
             if (!last_winner_name.empty()) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
