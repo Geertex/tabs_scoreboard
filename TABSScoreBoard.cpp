@@ -155,6 +155,9 @@ namespace TABSScoreboard
     static std::vector<Match> match_history;
     static std::string last_winner_name = "";
     static std::unique_ptr<Match> active_match = nullptr;
+    static ImVec4 goudeKleur = ImVec4(1.0f, 0.84f, 0.0f, 1.0f);
+    static ImVec4 rodeKleur = ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+    static ImVec4 blauweKleur = ImVec4(0.2f, 0.2f, 0.8f, 1.0f);
 
     // Use a flag to ensure you only load once
     static bool initialized = false;
@@ -201,10 +204,11 @@ namespace TABSScoreboard
             
             if (!last_winner_name.empty()) {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
-                ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "HOLDER OF THE CROWN :"); // Gold color
+                ImGui::TextColored(goudeKleur, "HOLDER OF THE CROWN :"); // Gold color
                 ImGui::SameLine();
-                ImGui::Text("%s", last_winner_name.c_str());
-                ImGui::TextColored(ImVec4(1.0f, 0.84f, 0.0f, 1.0f), "WIN STREAK = ");
+                if (match_history.back().GetBlue() == last_winner_name) ImGui::TextColored(blauweKleur, "%s", last_winner_name.c_str());
+                else ImGui::TextColored(rodeKleur, "%s", last_winner_name.c_str());
+                ImGui::TextColored(goudeKleur, "WIN STREAK = ");
                 ImGui::SameLine();
                 ImGui::Text("%d", CalculateCurrentStreak(match_history, last_winner_name));
                 ImGui::PopStyleVar();
@@ -218,7 +222,7 @@ namespace TABSScoreboard
 
                 // --- RED PLAYER BLOCK ---
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.1f, 0.1f, 1.0f));       // Dark Red
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.2f, 0.2f, 1.0f)); // Bright Red
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, rodeKleur); // Bright Red
                 
                 if (ImGui::Button(active_match->GetRed(), ImVec2(width * 0.45f, 60.0f))) {
                     active_match->RedWins();
@@ -232,7 +236,7 @@ namespace TABSScoreboard
 
                 // --- BLUE PLAYER BLOCK ---
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.1f, 0.1f, 0.6f, 1.0f));       // Dark Blue
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.2f, 0.2f, 0.8f, 1.0f)); // Bright Blue
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, blauweKleur); // Bright Blue
 
                 if (ImGui::Button(active_match->GetBlue(), ImVec2(width * 0.45f, 60.0f))) {
                     active_match->BlueWins();
